@@ -19,6 +19,7 @@ class _LoginPageState extends State<LoginPage> {
   final _emailCtrl = TextEditingController();
   final _passCtrl = TextEditingController();
   String? _error;
+  bool _isLoading = false;
 
   @override
   void initState() {
@@ -42,6 +43,8 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   Future<void> _login() async {
+    if (_isLoading) return;
+
     FocusScope.of(context).unfocus();
 
     final email = _emailCtrl.text.trim();
@@ -52,20 +55,28 @@ class _LoginPageState extends State<LoginPage> {
       return;
     }
 
-    final user = await UserDBHelper.instance.getUserByEmail(email);
-    if (user == null || user.password != _hashPassword(password)) {
-      setState(() => _error = 'อีเมลหรือรหัสผ่านไม่ถูกต้อง');
-      return;
+    setState(() => _isLoading = true);
+
+    try {
+      final user = await UserDBHelper.instance.getUserByEmail(email);
+      if (user == null || user.password != _hashPassword(password)) {
+        setState(() => _error = 'อีเมลหรือรหัสผ่านไม่ถูกต้อง');
+        return;
+      }
+
+      await AuthSession.setLoggedInEmail(user.email);
+
+      if (!mounted) return;
+
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => MainPage(user: user)),
+      );
+    } catch (e) {
+      setState(() => _error = 'เกิดข้อผิดพลาด: $e');
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
     }
-
-    await AuthSession.setLoggedInEmail(user.email);
-
-    if (!mounted) return;
-
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(builder: (_) => MainPage(user: user)),
-    );
   }
 
   void _goToRegister() {
@@ -73,6 +84,13 @@ class _LoginPageState extends State<LoginPage> {
       context,
       MaterialPageRoute(builder: (_) => const RegisterPage()),
     );
+  }
+
+  @override
+  void dispose() {
+    _emailCtrl.dispose();
+    _passCtrl.dispose();
+    super.dispose();
   }
 
   @override
@@ -102,9 +120,18 @@ class _LoginPageState extends State<LoginPage> {
                 child: Text(_error!, style: const TextStyle(color: Colors.red)),
               ),
             const SizedBox(height: 20),
-            ElevatedButton(onPressed: _login, child: const Text('เข้าสู่ระบบ')),
+            ElevatedButton(
+              onPressed: _isLoading ? null : _login,
+              child: _isLoading
+                  ? const SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+              )
+                  : const Text('เข้าสู่ระบบ'),
+            ),
             TextButton(
-              onPressed: _goToRegister,
+              onPressed: _isLoading ? null : _goToRegister,
               child: const Text('สมัครสมาชิก'),
             ),
           ],

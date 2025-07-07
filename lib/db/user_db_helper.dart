@@ -1,11 +1,15 @@
-import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
+import 'package:sqflite/sqflite.dart';
+
 import '../model/user_model.dart';
+import 'auth_session.dart';
 
 class UserDBHelper {
-  static final UserDBHelper instance = UserDBHelper._internal();
-  factory UserDBHelper() => instance;
   UserDBHelper._internal();
+
+  static final UserDBHelper instance = UserDBHelper._internal();
+
+  factory UserDBHelper() => instance;
 
   static Database? _database;
 
@@ -19,11 +23,7 @@ class UserDBHelper {
     final dbPath = await getDatabasesPath();
     final path = join(dbPath, filePath);
 
-    return await openDatabase(
-      path,
-      version: 1,
-      onCreate: _createDB,
-    );
+    return openDatabase(path, version: 1, onCreate: _createDB);
   }
 
   Future<void> _createDB(Database db, int version) async {
@@ -38,105 +38,89 @@ class UserDBHelper {
     ''');
   }
 
-  // Create or Insert new user (ถ้า user.id == null)
-  Future<int> insertUser(UserModel user) async {
+  Future<int> saveUser(UserModel user) async {
     final db = await database;
+    final map = _userToMap(user);
 
-    final map = <String, dynamic>{
-      'email': user.email,
-      'password': user.password,
-      'name': user.name,
-      'imagePath': user.imagePath,
-    };
-
-    return await db.insert(
-      'users',
-      map,
-      conflictAlgorithm: ConflictAlgorithm.replace,
-    );
+    if (user.id == null) {
+      return await db.insert(
+        'users',
+        map,
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
+    } else {
+      return await db.update(
+        'users',
+        map,
+        where: 'id = ?',
+        whereArgs: [user.id],
+      );
+    }
   }
 
-  // Read user by id
   Future<UserModel?> getUserByID(int id) async {
-    final db = await database;
-    final maps = await db.query(
-      'users',
-      where: 'id = ?',
-      whereArgs: [id],
-      limit: 1,
-    );
-
-    if (maps.isNotEmpty) {
-      return UserModelDBExtension.fromMap(maps.first);
-    } else {
-      return null;
-    }
+    return _getSingleUser(where: 'id = ?', whereArgs: [id]);
   }
 
   Future<UserModel?> getUserByEmail(String email) async {
+    return _getSingleUser(where: 'email = ?', whereArgs: [email]);
+  }
+
+  Future<UserModel?> getUser() async {
+    final email = await AuthSession.getLoggedInEmail();
+    if (email == null) return null;
+    return getUserByEmail(email);
+  }
+
+  Future<UserModel?> _getSingleUser({
+    required String where,
+    required List<dynamic> whereArgs,
+  }) async {
     final db = await database;
     final maps = await db.query(
       'users',
-      where: 'email = ?',
-      whereArgs: [email],
+      where: where,
+      whereArgs: whereArgs,
       limit: 1,
     );
 
     if (maps.isNotEmpty) {
       return UserModelDBExtension.fromMap(maps.first);
-    } else {
-      return null;
     }
+    return null;
   }
 
-
-  // Read all users
   Future<List<UserModel>> getAllUsers() async {
     final db = await database;
     final maps = await db.query('users');
 
     if (maps.isEmpty) return [];
 
-    return maps.map((map) => UserModelDBExtension.fromMap(map)).toList();
+    return maps.map(UserModelDBExtension.fromMap).toList();
   }
 
-  // Update user (user.id ต้องไม่ null)
-  Future<int> updateUser(UserModel user) async {
+  Future<int> deleteUser(int id) async {
     final db = await database;
-    if (user.id == null) {
-      throw Exception('Cannot update user without id');
-    }
+    return db.delete('users', where: 'id = ?', whereArgs: [id]);
+  }
 
+  Future<void> deleteDatabaseFile() async {
+    final dbPath = await getDatabasesPath();
+    final path = join(dbPath, 'users.db');
+    await deleteDatabase(path);
+    _database = null;
+  }
+
+  Map<String, dynamic> _userToMap(UserModel user) {
     final map = <String, dynamic>{
       'email': user.email,
       'password': user.password,
       'name': user.name,
       'imagePath': user.imagePath,
     };
-
-    return await db.update(
-      'users',
-      map,
-      where: 'id = ?',
-      whereArgs: [user.id],
-    );
-  }
-
-  // Delete user by id
-  Future<int> deleteUser(int id) async {
-    final db = await database;
-    return await db.delete(
-      'users',
-      where: 'id = ?',
-      whereArgs: [id],
-    );
-  }
-
-  // Delete database file (for debug only)
-  Future<void> deleteDatabaseFile() async {
-    final dbPath = await getDatabasesPath();
-    final path = join(dbPath, 'users.db');
-    await deleteDatabase(path);
-    _database = null;
+    if (user.id != null) {
+      map['id'] = user.id;
+    }
+    return map;
   }
 }

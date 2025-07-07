@@ -26,7 +26,6 @@ class ProductListTile extends StatelessWidget {
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: () {},
-        // หรือใส่ callback ที่ต้องการ
         hoverColor: Colors.grey.shade100,
         focusColor: Colors.grey.shade200,
         splashColor: theme.colorScheme.primary.withOpacity(0.1),

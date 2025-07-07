@@ -21,9 +21,6 @@ class AuthSession {
   static Future<void> clearSession() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_keyEmail);
-    // ถ้ามี key อื่นก็ค่อยเพิ่มตรงนี้
-    // await prefs.remove('authToken');
-    // await prefs.remove('userId');
   }
 
   static Future<bool> isLoggedIn() async {
@@ -31,3 +28,4 @@ class AuthSession {
     return email != null && email.isNotEmpty;
   }
 }
+

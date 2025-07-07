@@ -1,8 +1,13 @@
-import 'package:demo_flutter_app/pages/login_page.dart';
+import 'package:demo_flutter_app/pages/splash_page.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+
+import 'notifiers/user_notifier.dart';
 
 void main() {
-  runApp(const MyApp());
+  runApp(
+    ChangeNotifierProvider(create: (_) => UserNotifier(), child: const MyApp()),
+  );
 }
 
 class MyApp extends StatelessWidget {
@@ -16,7 +21,7 @@ class MyApp extends StatelessWidget {
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
       ),
-      home: LoginPage(),
+      home: SplashPage(),
     );
   }
 }

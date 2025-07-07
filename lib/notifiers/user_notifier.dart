@@ -1,7 +1,6 @@
-// lib/notifiers/user_notifier.dart
+import 'package:flutter/cupertino.dart';
 
-import 'package:flutter/foundation.dart';
-
+import '../db/user_db_helper.dart';
 import '../model/user_model.dart';
 
 class UserNotifier extends ChangeNotifier {
@@ -29,5 +28,13 @@ class UserNotifier extends ChangeNotifier {
   void clearUser() {
     _user = null;
     notifyListeners();
+  }
+
+  Future<void> loadUserFromDB() async {
+    final loadedUser = await UserDBHelper.instance.getUser();
+    if (loadedUser != null) {
+      _user = loadedUser;
+      notifyListeners();
+    }
   }
 }

@@ -93,7 +93,7 @@ class _RegisterPageState extends State<RegisterPage> {
         builder: (_) => const Center(child: CircularProgressIndicator()),
       );
 
-      await UserDBHelper().insertUser(user);
+      await UserDBHelper().saveUser(user);
 
       if (!mounted) return;
       Navigator.pop(context); // close loading

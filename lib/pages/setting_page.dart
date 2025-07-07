@@ -45,10 +45,12 @@ class _SettingPageState extends State<SettingPage> {
 
     final appDir = await getApplicationDocumentsDirectory();
     final fileName = path.basename(pickedFile.path);
-    final savedImage = await File(pickedFile.path).copy('${appDir.path}/$fileName');
+    final savedImage = await File(
+      pickedFile.path,
+    ).copy('${appDir.path}/$fileName');
 
     final updatedUser = _user!.copyWith(imagePath: savedImage.path);
-    await UserDBHelper.instance.updateUser(updatedUser);
+    await UserDBHelper.instance.saveUser(updatedUser);
 
     setState(() {
       _user = updatedUser;
