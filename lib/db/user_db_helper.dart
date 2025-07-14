@@ -6,9 +6,7 @@ import 'auth_session.dart';
 
 class UserDBHelper {
   UserDBHelper._internal();
-
   static final UserDBHelper instance = UserDBHelper._internal();
-
   factory UserDBHelper() => instance;
 
   static Database? _database;
@@ -23,14 +21,18 @@ class UserDBHelper {
     final dbPath = await getDatabasesPath();
     final path = join(dbPath, filePath);
 
-    return openDatabase(path, version: 1, onCreate: _createDB);
+    return await openDatabase(
+      path,
+      version: 1,
+      onCreate: _createDB,
+    );
   }
 
   Future<void> _createDB(Database db, int version) async {
     await db.execute('''
       CREATE TABLE users (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        email TEXT NOT NULL,
+        email TEXT NOT NULL UNIQUE,
         password TEXT NOT NULL,
         name TEXT NOT NULL,
         imagePath TEXT
@@ -38,6 +40,7 @@ class UserDBHelper {
     ''');
   }
 
+  /// Insert or update user (UPSERT logic)
   Future<int> saveUser(UserModel user) async {
     final db = await database;
     final map = _userToMap(user);
@@ -58,6 +61,17 @@ class UserDBHelper {
     }
   }
 
+  Future<int> update(UserModel user) async {
+    if (user.id == null) throw Exception('User ID is null');
+    final db = await database;
+    return await db.update(
+      'users',
+      _userToMap(user),
+      where: 'id = ?',
+      whereArgs: [user.id],
+    );
+  }
+
   Future<UserModel?> getUserByID(int id) async {
     return _getSingleUser(where: 'id = ?', whereArgs: [id]);
   }
@@ -66,10 +80,11 @@ class UserDBHelper {
     return _getSingleUser(where: 'email = ?', whereArgs: [email]);
   }
 
+  /// Get current logged-in user from AuthSession
   Future<UserModel?> getUser() async {
     final email = await AuthSession.getLoggedInEmail();
     if (email == null) return null;
-    return getUserByEmail(email);
+    return await getUserByEmail(email);
   }
 
   Future<UserModel?> _getSingleUser({
@@ -77,31 +92,27 @@ class UserDBHelper {
     required List<dynamic> whereArgs,
   }) async {
     final db = await database;
-    final maps = await db.query(
+    final result = await db.query(
       'users',
       where: where,
       whereArgs: whereArgs,
       limit: 1,
     );
 
-    if (maps.isNotEmpty) {
-      return UserModelDBExtension.fromMap(maps.first);
-    }
-    return null;
+    if (result.isEmpty) return null;
+    return UserModelDBExtension.fromMap(result.first);
   }
 
   Future<List<UserModel>> getAllUsers() async {
     final db = await database;
-    final maps = await db.query('users');
+    final result = await db.query('users');
 
-    if (maps.isEmpty) return [];
-
-    return maps.map(UserModelDBExtension.fromMap).toList();
+    return result.map(UserModelDBExtension.fromMap).toList();
   }
 
   Future<int> deleteUser(int id) async {
     final db = await database;
-    return db.delete('users', where: 'id = ?', whereArgs: [id]);
+    return await db.delete('users', where: 'id = ?', whereArgs: [id]);
   }
 
   Future<void> deleteDatabaseFile() async {
@@ -112,15 +123,12 @@ class UserDBHelper {
   }
 
   Map<String, dynamic> _userToMap(UserModel user) {
-    final map = <String, dynamic>{
+    return {
+      if (user.id != null) 'id': user.id,
       'email': user.email,
       'password': user.password,
       'name': user.name,
       'imagePath': user.imagePath,
     };
-    if (user.id != null) {
-      map['id'] = user.id;
-    }
-    return map;
   }
 }

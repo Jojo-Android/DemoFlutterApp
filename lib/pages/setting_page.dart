@@ -1,13 +1,13 @@
 import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:path/path.dart' as path;
 import 'package:path_provider/path_provider.dart';
+import 'package:provider/provider.dart';
 
 import '../db/auth_session.dart';
 import '../db/user_db_helper.dart';
-import '../model/user_model.dart';
+import '../notifiers/user_notifier.dart';
 import 'login_page.dart';
 
 class SettingPage extends StatefulWidget {
@@ -18,7 +18,6 @@ class SettingPage extends StatefulWidget {
 }
 
 class _SettingPageState extends State<SettingPage> {
-  UserModel? _user;
   bool _isLoading = true;
 
   @override
@@ -28,84 +27,132 @@ class _SettingPageState extends State<SettingPage> {
   }
 
   Future<void> _loadUser() async {
-    final email = await AuthSession.getLoggedInEmail();
-    if (email == null) return;
+    final user = await UserDBHelper.instance.getUser();
+    if (!mounted) return;
 
-    final user = await UserDBHelper.instance.getUserByEmail(email);
-    setState(() {
-      _user = user;
-      _isLoading = false;
-    });
+    if (user != null) {
+      context.read<UserNotifier>().setUser(user);
+    }
+
+    setState(() => _isLoading = false);
   }
 
   Future<void> _pickImage() async {
     final picker = ImagePicker();
-    final pickedFile = await picker.pickImage(source: ImageSource.gallery);
-    if (pickedFile == null || _user == null) return;
+    final picked = await picker.pickImage(source: ImageSource.gallery);
+    if (picked == null) return;
 
     final appDir = await getApplicationDocumentsDirectory();
-    final fileName = path.basename(pickedFile.path);
-    final savedImage = await File(
-      pickedFile.path,
-    ).copy('${appDir.path}/$fileName');
+    final fileName = path.basename(picked.path);
+    final savedImage = await File(picked.path).copy('${appDir.path}/$fileName');
 
-    final updatedUser = _user!.copyWith(imagePath: savedImage.path);
-    await UserDBHelper.instance.saveUser(updatedUser);
-
-    setState(() {
-      _user = updatedUser;
-    });
+    await context.read<UserNotifier>().updateProfileImage(savedImage.path);
   }
 
-  Future<void> _logout(BuildContext context) async {
+  Future<void> _logout() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('ยืนยันการออกจากระบบ'),
+        content: const Text('คุณต้องการออกจากระบบใช่หรือไม่?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('ยกเลิก')),
+          TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('ออกจากระบบ')),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
     await AuthSession.clearSession();
     if (!mounted) return;
-    Navigator.pushReplacement(
+
+    Navigator.pushAndRemoveUntil(
       context,
       MaterialPageRoute(builder: (_) => const LoginPage()),
+          (_) => false,
+    );
+  }
+
+  void _showChangeLanguageDialog() {
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('เปลี่ยนภาษา'),
+        content: const Text('ระบบนี้ยังไม่รองรับภาษาเพิ่มเติม'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('ปิด')),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildProfileAvatar(String? imagePath) {
+    final theme = Theme.of(context);
+    final isImageSet = imagePath != null && imagePath.isNotEmpty;
+
+    return GestureDetector(
+      onTap: _pickImage,
+      child: Hero(
+        tag: 'profile',
+        child: CircleAvatar(
+          radius: 60,
+          backgroundColor: theme.colorScheme.secondaryContainer,
+          backgroundImage: isImageSet ? FileImage(File(imagePath!)) : null,
+          child: !isImageSet
+              ? const Icon(Icons.account_circle, size: 100, color: Colors.white70)
+              : null,
+        ),
+      ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
+    final user = context.watch<UserNotifier>().user;
+    final theme = Theme.of(context);
+
     if (_isLoading) {
-      return const Center(child: CircularProgressIndicator());
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
-    final user = _user;
+    if (user == null) {
+      return const Scaffold(body: Center(child: Text('ไม่พบข้อมูลผู้ใช้')));
+    }
 
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          if (user != null) ...[
-            GestureDetector(
-              onTap: _pickImage,
-              child: CircleAvatar(
-                radius: 50,
-                backgroundImage: user.imagePath != null
-                    ? FileImage(File(user.imagePath!))
-                    : null,
-                child: user.imagePath == null
-                    ? const Icon(Icons.account_circle, size: 80)
-                    : null,
+    return Scaffold(
+      body: CustomScrollView(
+        slivers: [
+          SliverAppBar(
+            expandedHeight: 200,
+            pinned: true,
+            iconTheme: const IconThemeData(color: Colors.white),
+            flexibleSpace: FlexibleSpaceBar(
+              centerTitle: true,
+              title: Text(user.name, style: const TextStyle(color: Colors.white)),
+              background: Container(
+                color: theme.colorScheme.primary,
+                alignment: Alignment.center,
+                child: _buildProfileAvatar(user.imagePath),
               ),
             ),
-            const SizedBox(height: 16),
-            Text(
-              user.name,
-              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 8),
-            Text(user.email),
-            const SizedBox(height: 24),
-          ] else ...[
-            const Text('Not logged in'),
-            const SizedBox(height: 24),
-          ],
-          ElevatedButton(
-            onPressed: () => _logout(context),
-            child: const Text('Logout'),
+          ),
+          SliverList(
+            delegate: SliverChildListDelegate([
+              const SizedBox(height: 12),
+              ListTile(
+                leading: const Icon(Icons.language),
+                title: const Text('เปลี่ยนภาษา'),
+                onTap: _showChangeLanguageDialog,
+              ),
+              const Divider(height: 0),
+              ListTile(
+                leading: const Icon(Icons.logout),
+                title: const Text('ออกจากระบบ'),
+                onTap: _logout,
+              ),
+              const SizedBox(height: 50),
+            ]),
           ),
         ],
       ),
