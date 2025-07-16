@@ -31,7 +31,6 @@ class AvatarPicker extends StatelessWidget {
                   ? Icon(
                 Icons.account_circle,
                 size: 100,
-                color: Colors.white70,
               )
                   : null,
             ),

@@ -7,8 +7,6 @@ import 'package:provider/provider.dart';
 
 import '../l10n/app_localizations.dart';
 import '../notifiers/user_notifier.dart';
-import 'login_page.dart';
-import 'main_page.dart';
 
 class SplashPage extends StatefulWidget {
   const SplashPage({super.key});
@@ -47,14 +45,12 @@ class _SplashPageState extends State<SplashPage> with TickerProviderStateMixin {
 
     final user = userNotifier.user;
 
-    // ✅ ใช้ go_router นำทาง
     if (user != null) {
       context.goNamed(AppRoutes.main);
     } else {
       context.goNamed(AppRoutes.login);
     }
   }
-
 
   @override
   void dispose() {

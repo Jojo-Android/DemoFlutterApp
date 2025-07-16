@@ -56,36 +56,28 @@ class UserProfileAppBar extends StatelessWidget implements PreferredSizeWidget {
                   clipBehavior: Clip.antiAlias,
                   child: InkWell(
                     onTap: onAvatarTap,
-                    splashColor: theme.colorScheme.primary.withOpacity(0.15),
                     child: Container(
                       width: 72,
                       height: 72,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        gradient: LinearGradient(
-                          colors: [
-                            theme.colorScheme.primary.withOpacity(0.6),
-                            theme.colorScheme.primaryContainer,
-                          ],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        ),
+                       color: theme.colorScheme.secondaryContainer,
                       ),
                       child: ClipOval(
                         child: hasImage
                             ? Image.file(
-                          File(imagePath!),
+                          File(imagePath),
                           fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) => Icon(
+                          errorBuilder: (_, _, _) => Icon(
                             Icons.account_circle,
                             size: 72,
-                            color: theme.colorScheme.onPrimary,
+                            color: Color(Colors.white.value),
                           ),
                         )
                             : Icon(
                           Icons.account_circle,
                           size: 72,
-                          color: theme.colorScheme.onPrimary,
+                          color: Color(Colors.white.value),
                         ),
                       ),
                     ),
