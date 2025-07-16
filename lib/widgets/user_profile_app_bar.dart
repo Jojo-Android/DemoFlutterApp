@@ -1,12 +1,14 @@
 import 'dart:io';
+import 'package:demo_flutter_app/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart'; // เพิ่มเพื่อควบคุม Status Bar
+import 'package:flutter/services.dart'; // ควบคุม Status Bar
 import 'package:provider/provider.dart';
 import '../notifiers/user_notifier.dart';
-import '../pages/setting_page.dart';
 
 class UserProfileAppBar extends StatelessWidget implements PreferredSizeWidget {
-  const UserProfileAppBar({super.key});
+  final VoidCallback? onAvatarTap;
+
+  const UserProfileAppBar({super.key, this.onAvatarTap});
 
   @override
   Size get preferredSize => const Size.fromHeight(120);
@@ -15,13 +17,16 @@ class UserProfileAppBar extends StatelessWidget implements PreferredSizeWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final user = context.watch<UserNotifier>().user;
+    final local = AppLocalizations.of(context)!;
 
-    // กำหนด StatusBar โปร่งใส + ไอคอนสีเข้ากับพื้นหลัง
+    final imagePath = user?.imagePath;
+    final hasImage = imagePath != null && imagePath.isNotEmpty && File(imagePath).existsSync();
+
     return AnnotatedRegion<SystemUiOverlayStyle>(
-      value: SystemUiOverlayStyle(
-        statusBarColor: Colors.transparent, // ทำให้โปร่งใส
-        statusBarIconBrightness: Brightness.dark, // ไอคอน status bar เป็นสีดำ (เหมาะกับพื้นหลังสว่าง)
-        statusBarBrightness: Brightness.light, // iOS
+      value: const SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: Brightness.dark,
+        statusBarBrightness: Brightness.light,
       ),
       child: Container(
         decoration: BoxDecoration(
@@ -32,7 +37,6 @@ class UserProfileAppBar extends StatelessWidget implements PreferredSizeWidget {
           ),
           borderRadius: const BorderRadius.vertical(bottom: Radius.circular(24)),
           boxShadow: [
-            // ถ้าไม่ต้องการเงาเลย ให้เอาออก หรือปรับ opacity เป็น 0
             BoxShadow(
               color: Colors.black.withOpacity(0.03),
               blurRadius: 10,
@@ -51,7 +55,7 @@ class UserProfileAppBar extends StatelessWidget implements PreferredSizeWidget {
                   shape: const CircleBorder(),
                   clipBehavior: Clip.antiAlias,
                   child: InkWell(
-                    onTap: () {},
+                    onTap: onAvatarTap,
                     splashColor: theme.colorScheme.primary.withOpacity(0.15),
                     child: Container(
                       width: 72,
@@ -68,12 +72,20 @@ class UserProfileAppBar extends StatelessWidget implements PreferredSizeWidget {
                         ),
                       ),
                       child: ClipOval(
-                        child: (user?.imagePath != null && user!.imagePath!.isNotEmpty)
-                            ? Image.file(File(user.imagePath!), fit: BoxFit.cover)
+                        child: hasImage
+                            ? Image.file(
+                          File(imagePath!),
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => Icon(
+                            Icons.account_circle,
+                            size: 72,
+                            color: theme.colorScheme.onPrimary,
+                          ),
+                        )
                             : Icon(
-                          Icons.account_circle_rounded,
+                          Icons.account_circle,
                           size: 72,
-                          color: theme.colorScheme.onPrimaryContainer,
+                          color: theme.colorScheme.onPrimary,
                         ),
                       ),
                     ),
@@ -86,7 +98,7 @@ class UserProfileAppBar extends StatelessWidget implements PreferredSizeWidget {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Text(
-                        'Welcome back,',
+                        local.welcome,
                         style: theme.textTheme.labelMedium?.copyWith(
                           color: theme.colorScheme.primary,
                           fontWeight: FontWeight.w500,
@@ -94,7 +106,7 @@ class UserProfileAppBar extends StatelessWidget implements PreferredSizeWidget {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        user?.name ?? 'User',
+                        user?.name ?? local.user,
                         style: theme.textTheme.titleLarge?.copyWith(
                           fontWeight: FontWeight.bold,
                           color: theme.colorScheme.onSurface,
