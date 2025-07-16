@@ -24,21 +24,39 @@ class RegisterPage extends StatefulWidget {
 
 class _RegisterPageState extends State<RegisterPage> {
   final _formKey = GlobalKey<FormBuilderState>();
-  final ValueNotifier<bool> _isFormValid = ValueNotifier(false);
-  bool _obscurePass = true;
+  final _isFormFilled = ValueNotifier(false);
+  bool _obscurePassword = true;
   bool _obscureConfirm = true;
-  String? _imagePath;
   bool _isLoading = false;
+  String? _imagePath;
 
   @override
   void dispose() {
-    _isFormValid.dispose();
+    _isFormFilled.dispose();
     super.dispose();
   }
 
-  Future<void> _pickImage() async {
-    final localizations = AppLocalizations.of(context)!;
+  void _checkFormFilled() {
+    final form = _formKey.currentState;
+    if (form == null) return;
 
+    form.save();
+    final values = form.value;
+    final requiredFields = ['name', 'email', 'password', 'confirm_password'];
+
+    final filled = requiredFields.every((key) {
+      final val = values[key];
+      return val != null && val.toString().trim().isNotEmpty;
+    });
+
+    _isFormFilled.value = filled;
+  }
+
+  String _hashPassword(String raw) =>
+      sha256.convert(utf8.encode(raw)).toString();
+
+  Future<void> _pickImage() async {
+    final l10n = AppLocalizations.of(context)!;
     try {
       final picker = ImagePicker();
       final picked = await picker.pickImage(source: ImageSource.gallery);
@@ -46,28 +64,26 @@ class _RegisterPageState extends State<RegisterPage> {
 
       final appDir = await getApplicationDocumentsDirectory();
       final fileName = '${DateTime.now().millisecondsSinceEpoch}.png';
-      final savedImage = await File(picked.path).copy('${appDir.path}/$fileName');
+      final saved = await File(picked.path).copy('${appDir.path}/$fileName');
 
-      setState(() => _imagePath = savedImage.path);
-      _checkFormValidity();
+      setState(() => _imagePath = saved.path);
+      _checkFormFilled();
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(
-        SnackBar(content: Text(localizations.registerPickImageFailedWithError(e.toString()))),
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(l10n.registerPickImageFailedWithError(e.toString())),
+        ),
       );
     }
   }
-
-  String _hashPassword(String raw) => sha256.convert(utf8.encode(raw)).toString();
 
   Future<void> _register() async {
     final form = _formKey.currentState;
     if (form == null || !form.saveAndValidate()) return;
 
+    final l10n = AppLocalizations.of(context)!;
     setState(() => _isLoading = true);
-    final localizations = AppLocalizations.of(context)!;
 
     final values = form.value;
     final name = values['name'].toString().trim();
@@ -78,90 +94,72 @@ class _RegisterPageState extends State<RegisterPage> {
       final existingUser = await UserDBHelper().getUserByEmail(email);
       if (existingUser != null) {
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(localizations.registerEmailInUse)),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(l10n.registerEmailInUse)));
         setState(() => _isLoading = false);
         return;
       }
 
-      final hashedPass = _hashPassword(password);
       final user = UserModel(
         name: name,
         email: email,
-        password: hashedPass,
+        password: _hashPassword(password),
         imagePath: _imagePath,
       );
-
       await UserDBHelper().saveUser(user);
 
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text(localizations.registerSuccess)));
+      ).showSnackBar(SnackBar(content: Text(l10n.registerSuccess)));
 
       form.reset();
       setState(() {
-        _imagePath = null;
-        _obscurePass = true;
-        _obscureConfirm = true;
         _isLoading = false;
+        _imagePath = null;
+        _obscurePassword = true;
+        _obscureConfirm = true;
       });
-      _isFormValid.value = false;
-
-      context.pop(); // ใช้ go_router pop กลับไปหน้าก่อนหน้า
+      _isFormFilled.value = false;
+      context.pop();
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(localizations.registerFormGenericError(e.toString())),
-        ),
+        SnackBar(content: Text(l10n.registerFormGenericError(e.toString()))),
       );
       setState(() => _isLoading = false);
     }
   }
 
-  void _checkFormValidity() {
-    final form = _formKey.currentState;
-    if (form == null) return;
-
-    form.save();
-    final values = form.value;
-    final requiredFields = ['name', 'email', 'password', 'confirm_password'];
-
-    final hasAllValues = requiredFields.every((key) {
-      final val = values[key];
-      return val != null && val.toString().trim().isNotEmpty;
-    });
-
-    final hasNoErrors = requiredFields.every((key) {
-      final error = form.fields[key]?.errorText;
-      return error == null;
-    });
-
-    _isFormValid.value = hasAllValues && hasNoErrors;
+  InputDecoration _inputDecoration({
+    required String label,
+    required IconData icon,
+    Widget? suffixIcon,
+  }) {
+    final theme = Theme.of(context);
+    return InputDecoration(
+      labelText: label,
+      prefixIcon: Icon(icon, color: theme.colorScheme.primary),
+      suffixIcon: suffixIcon,
+      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: theme.colorScheme.primary, width: 2),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final primaryColor = theme.colorScheme.primary;
-    final onPrimaryColor = theme.colorScheme.onPrimary;
-    final localizations = AppLocalizations.of(context)!;
+    final l10n = AppLocalizations.of(context)!;
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(localizations.registerPageTitle),
-        backgroundColor: primaryColor,
-        foregroundColor: onPrimaryColor,
-        elevation: 4,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () {
-            context.pop();
-          },
-          tooltip: MaterialLocalizations.of(context).backButtonTooltip,
-        ),
+        title: Text(l10n.registerPageTitle),
+        backgroundColor: theme.colorScheme.primary,
+        foregroundColor: theme.colorScheme.onPrimary,
       ),
       body: GestureDetector(
         behavior: HitTestBehavior.opaque,
@@ -170,6 +168,7 @@ class _RegisterPageState extends State<RegisterPage> {
           padding: const EdgeInsets.all(16),
           child: FormBuilder(
             key: _formKey,
+            onChanged: _checkFormFilled,
             child: ListView(
               keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
               children: [
@@ -177,202 +176,125 @@ class _RegisterPageState extends State<RegisterPage> {
                   child: AvatarPicker(imagePath: _imagePath, onTap: _pickImage),
                 ),
                 const SizedBox(height: 24),
-                // Name
                 FormBuilderTextField(
                   name: 'name',
-                  decoration: InputDecoration(
-                    labelText: localizations.registerNameLabel,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(color: primaryColor, width: 2),
-                    ),
-                    prefixIcon: Icon(Icons.person_outline, color: primaryColor),
+                  decoration: _inputDecoration(
+                    label: l10n.registerNameLabel,
+                    icon: Icons.person,
                   ),
                   validator: FormBuilderValidators.required(
-                    errorText: localizations.registerFieldRequiredName,
+                    errorText: l10n.registerFieldRequiredName,
                   ),
                   textInputAction: TextInputAction.next,
-                  onEditingComplete: () {
-                    _formKey.currentState?.fields['name']?.validate();
-                    _checkFormValidity();
-                    FocusScope.of(context).nextFocus();
-                  },
                 ),
                 const SizedBox(height: 16),
-
-                // Email
                 FormBuilderTextField(
                   name: 'email',
-                  decoration: InputDecoration(
-                    labelText: localizations.registerEmailLabel,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(color: primaryColor, width: 2),
-                    ),
-                    prefixIcon: Icon(Icons.email_outlined, color: primaryColor),
+                  decoration: _inputDecoration(
+                    label: l10n.registerEmailLabel,
+                    icon: Icons.email,
                   ),
-                  keyboardType: TextInputType.emailAddress,
+                  validator: FormBuilderValidators.compose([
+                    FormBuilderValidators.required(
+                      errorText: l10n.registerFieldRequiredEmail,
+                    ),
+                    FormBuilderValidators.email(
+                      errorText: l10n.registerFormInvalidEmail,
+                    ),
+                  ]),
                   inputFormatters: [
                     FilteringTextInputFormatter.deny(RegExp(r'\s')),
                   ],
-                  validator: FormBuilderValidators.compose([
-                    FormBuilderValidators.required(
-                      errorText: localizations.registerFieldRequiredEmail,
-                    ),
-                    FormBuilderValidators.email(
-                      errorText: localizations.registerFormInvalidEmail,
-                    ),
-                  ]),
+                  keyboardType: TextInputType.emailAddress,
                   textInputAction: TextInputAction.next,
-                  onEditingComplete: () {
-                    _formKey.currentState?.fields['email']?.validate();
-                    _checkFormValidity();
-                    FocusScope.of(context).nextFocus();
-                  },
                 ),
                 const SizedBox(height: 16),
-
-                // Password
                 FormBuilderTextField(
                   name: 'password',
-                  obscureText: _obscurePass,
-                  decoration: InputDecoration(
-                    labelText: localizations.registerPasswordLabel,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(color: primaryColor, width: 2),
-                    ),
-                    prefixIcon: Icon(Icons.lock_outline, color: primaryColor),
+                  obscureText: _obscurePassword,
+                  decoration: _inputDecoration(
+                    label: l10n.registerPasswordLabel,
+                    icon: Icons.lock,
                     suffixIcon: IconButton(
                       icon: Icon(
-                        _obscurePass ? Icons.visibility : Icons.visibility_off,
-                        color: primaryColor,
+                        _obscurePassword
+                            ? Icons.visibility
+                            : Icons.visibility_off,
+                        color: theme.colorScheme.primary,
                       ),
-                      onPressed: () => setState(() {
-                        _obscurePass = !_obscurePass;
-                      }),
-                      splashRadius: 24,
-                      tooltip: _obscurePass
-                          ? localizations.registerPickImageTooltipShow
-                          : localizations.registerPickImageTooltipHide,
+                      onPressed: () =>
+                          setState(() => _obscurePassword = !_obscurePassword),
                     ),
                   ),
                   validator: FormBuilderValidators.compose([
                     FormBuilderValidators.required(
-                      errorText: localizations.registerFieldRequiredPassword,
+                      errorText: l10n.registerFieldRequiredPassword,
                     ),
                     FormBuilderValidators.minLength(
                       6,
-                      errorText: localizations.registerPasswordMinLength,
+                      errorText: l10n.registerPasswordMinLength,
                     ),
                   ]),
                   textInputAction: TextInputAction.next,
-                  onEditingComplete: () {
-                    _formKey.currentState?.fields['password']?.validate();
-                    _checkFormValidity();
-                    FocusScope.of(context).nextFocus();
-                  },
                 ),
                 const SizedBox(height: 16),
-
-                // Confirm Password
                 FormBuilderTextField(
                   name: 'confirm_password',
                   obscureText: _obscureConfirm,
-                  decoration: InputDecoration(
-                    labelText: localizations.registerConfirmPasswordLabel,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(color: primaryColor, width: 2),
-                    ),
-                    prefixIcon: Icon(Icons.lock_outline, color: primaryColor),
+                  decoration: _inputDecoration(
+                    label: l10n.registerConfirmPasswordLabel,
+                    icon: Icons.lock,
                     suffixIcon: IconButton(
                       icon: Icon(
                         _obscureConfirm
                             ? Icons.visibility
                             : Icons.visibility_off,
-                        color: primaryColor,
+                        color: theme.colorScheme.primary,
                       ),
-                      onPressed: () => setState(() {
-                        _obscureConfirm = !_obscureConfirm;
-                      }),
-                      splashRadius: 24,
-                      tooltip: _obscureConfirm
-                          ? localizations.registerPickImageTooltipShow
-                          : localizations.registerPickImageTooltipHide,
+                      onPressed: () =>
+                          setState(() => _obscureConfirm = !_obscureConfirm),
                     ),
                   ),
-                  validator: (val) {
-                    final pass =
+                  validator: (value) {
+                    final password =
                         _formKey.currentState?.fields['password']?.value
                             ?.toString()
                             .trim() ??
-                            '';
-                    if (val == null || val.trim().isEmpty) {
-                      return localizations.registerConfirmPasswordEmpty;
+                        '';
+                    if (value == null || value.trim().isEmpty) {
+                      return l10n.registerConfirmPasswordEmpty;
                     }
-                    if (val.trim() != pass) {
-                      return localizations.registerConfirmPasswordMismatch;
+                    if (value.trim() != password) {
+                      return l10n.registerConfirmPasswordMismatch;
                     }
                     return null;
                   },
                   textInputAction: TextInputAction.done,
-                  onEditingComplete: () {
-                    _formKey.currentState?.fields['confirm_password']
-                        ?.validate();
-                    _checkFormValidity();
-                    FocusScope.of(context).unfocus();
-                  },
                 ),
-
                 const SizedBox(height: 32),
-
                 ValueListenableBuilder<bool>(
-                  valueListenable: _isFormValid,
-                  builder: (_, isValid, __) {
-                    return SizedBox(
-                      height: 50,
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        onPressed: isValid && !_isLoading ? _register : null,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: primaryColor,
-                          foregroundColor: onPrimaryColor,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          elevation: 6,
-                          shadowColor: primaryColor.withOpacity(0.4),
-                          textStyle: const TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                          ),
+                  valueListenable: _isFormFilled,
+                  builder: (_, filled, __) => SizedBox(
+                    height: 50,
+                    child: ElevatedButton(
+                      onPressed: filled && !_isLoading ? _register : null,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: theme.colorScheme.primary,
+                        foregroundColor: theme.colorScheme.onPrimary,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
                         ),
-                        child: _isLoading
-                            ? SizedBox(
-                          width: 24,
-                          height: 24,
-                          child: CircularProgressIndicator(
-                            color: onPrimaryColor,
-                            strokeWidth: 2,
-                          ),
-                        )
-                            : Text(localizations.registerButton),
+                        elevation: 6,
                       ),
-                    );
-                  },
+                      child: _isLoading
+                          ? const SizedBox(
+                              width: 24,
+                              height: 24,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : Text(l10n.registerButton),
+                    ),
+                  ),
                 ),
               ],
             ),
