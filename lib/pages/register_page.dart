@@ -6,10 +6,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_form_builder/flutter_form_builder.dart';
 import 'package:form_builder_validators/form_builder_validators.dart';
+import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
 
 import '../db/user_db_helper.dart';
+import '../l10n/app_localizations.dart';
 import '../model/user_model.dart';
 import '../widgets/avatar_picker.dart';
 
@@ -35,6 +37,8 @@ class _RegisterPageState extends State<RegisterPage> {
   }
 
   Future<void> _pickImage() async {
+    final localizations = AppLocalizations.of(context)!;
+
     try {
       final picker = ImagePicker();
       final picked = await picker.pickImage(source: ImageSource.gallery);
@@ -48,8 +52,10 @@ class _RegisterPageState extends State<RegisterPage> {
       _checkFormValidity();
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('ไม่สามารถเลือกภาพได้: $e')),
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(
+        SnackBar(content: Text(localizations.registerPickImageFailedWithError(e.toString()))),
       );
     }
   }
@@ -61,6 +67,7 @@ class _RegisterPageState extends State<RegisterPage> {
     if (form == null || !form.saveAndValidate()) return;
 
     setState(() => _isLoading = true);
+    final localizations = AppLocalizations.of(context)!;
 
     final values = form.value;
     final name = values['name'].toString().trim();
@@ -71,7 +78,9 @@ class _RegisterPageState extends State<RegisterPage> {
       final existingUser = await UserDBHelper().getUserByEmail(email);
       if (existingUser != null) {
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('อีเมลนี้ถูกใช้แล้ว')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(localizations.registerEmailInUse)),
+        );
         setState(() => _isLoading = false);
         return;
       }
@@ -87,7 +96,9 @@ class _RegisterPageState extends State<RegisterPage> {
       await UserDBHelper().saveUser(user);
 
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('สมัครสมาชิกสำเร็จ')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(localizations.registerSuccess)));
 
       form.reset();
       setState(() {
@@ -97,10 +108,15 @@ class _RegisterPageState extends State<RegisterPage> {
         _isLoading = false;
       });
       _isFormValid.value = false;
-      Navigator.pop(context); // กลับหน้าก่อนหน้า
+
+      context.pop(); // ใช้ go_router pop กลับไปหน้าก่อนหน้า
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('เกิดข้อผิดพลาด: $e')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(localizations.registerFormGenericError(e.toString())),
+        ),
+      );
       setState(() => _isLoading = false);
     }
   }
@@ -131,13 +147,21 @@ class _RegisterPageState extends State<RegisterPage> {
     final theme = Theme.of(context);
     final primaryColor = theme.colorScheme.primary;
     final onPrimaryColor = theme.colorScheme.onPrimary;
+    final localizations = AppLocalizations.of(context)!;
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('สมัครสมาชิก'),
+        title: Text(localizations.registerPageTitle),
         backgroundColor: primaryColor,
         foregroundColor: onPrimaryColor,
         elevation: 4,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () {
+            context.pop();
+          },
+          tooltip: MaterialLocalizations.of(context).backButtonTooltip,
+        ),
       ),
       body: GestureDetector(
         behavior: HitTestBehavior.opaque,
@@ -157,15 +181,19 @@ class _RegisterPageState extends State<RegisterPage> {
                 FormBuilderTextField(
                   name: 'name',
                   decoration: InputDecoration(
-                    labelText: 'ชื่อ',
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    labelText: localizations.registerNameLabel,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                       borderSide: BorderSide(color: primaryColor, width: 2),
                     ),
                     prefixIcon: Icon(Icons.person_outline, color: primaryColor),
                   ),
-                  validator: FormBuilderValidators.required(errorText: 'กรุณากรอกชื่อ'),
+                  validator: FormBuilderValidators.required(
+                    errorText: localizations.registerFieldRequiredName,
+                  ),
                   textInputAction: TextInputAction.next,
                   onEditingComplete: () {
                     _formKey.currentState?.fields['name']?.validate();
@@ -179,8 +207,10 @@ class _RegisterPageState extends State<RegisterPage> {
                 FormBuilderTextField(
                   name: 'email',
                   decoration: InputDecoration(
-                    labelText: 'อีเมล',
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    labelText: localizations.registerEmailLabel,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                       borderSide: BorderSide(color: primaryColor, width: 2),
@@ -188,10 +218,16 @@ class _RegisterPageState extends State<RegisterPage> {
                     prefixIcon: Icon(Icons.email_outlined, color: primaryColor),
                   ),
                   keyboardType: TextInputType.emailAddress,
-                  inputFormatters: [FilteringTextInputFormatter.deny(RegExp(r'\s'))],
+                  inputFormatters: [
+                    FilteringTextInputFormatter.deny(RegExp(r'\s')),
+                  ],
                   validator: FormBuilderValidators.compose([
-                    FormBuilderValidators.required(errorText: 'กรุณากรอกอีเมล'),
-                    FormBuilderValidators.email(errorText: 'รูปแบบอีเมลไม่ถูกต้อง'),
+                    FormBuilderValidators.required(
+                      errorText: localizations.registerFieldRequiredEmail,
+                    ),
+                    FormBuilderValidators.email(
+                      errorText: localizations.registerFormInvalidEmail,
+                    ),
                   ]),
                   textInputAction: TextInputAction.next,
                   onEditingComplete: () {
@@ -207,8 +243,10 @@ class _RegisterPageState extends State<RegisterPage> {
                   name: 'password',
                   obscureText: _obscurePass,
                   decoration: InputDecoration(
-                    labelText: 'รหัสผ่าน',
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    labelText: localizations.registerPasswordLabel,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                       borderSide: BorderSide(color: primaryColor, width: 2),
@@ -223,12 +261,19 @@ class _RegisterPageState extends State<RegisterPage> {
                         _obscurePass = !_obscurePass;
                       }),
                       splashRadius: 24,
-                      tooltip: _obscurePass ? 'แสดงรหัสผ่าน' : 'ซ่อนรหัสผ่าน',
+                      tooltip: _obscurePass
+                          ? localizations.registerPickImageTooltipShow
+                          : localizations.registerPickImageTooltipHide,
                     ),
                   ),
                   validator: FormBuilderValidators.compose([
-                    FormBuilderValidators.required(errorText: 'กรุณากรอกรหัสผ่าน'),
-                    FormBuilderValidators.minLength(6, errorText: 'อย่างน้อย 6 ตัว'),
+                    FormBuilderValidators.required(
+                      errorText: localizations.registerFieldRequiredPassword,
+                    ),
+                    FormBuilderValidators.minLength(
+                      6,
+                      errorText: localizations.registerPasswordMinLength,
+                    ),
                   ]),
                   textInputAction: TextInputAction.next,
                   onEditingComplete: () {
@@ -244,8 +289,10 @@ class _RegisterPageState extends State<RegisterPage> {
                   name: 'confirm_password',
                   obscureText: _obscureConfirm,
                   decoration: InputDecoration(
-                    labelText: 'ยืนยันรหัสผ่าน',
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    labelText: localizations.registerConfirmPasswordLabel,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                       borderSide: BorderSide(color: primaryColor, width: 2),
@@ -253,29 +300,38 @@ class _RegisterPageState extends State<RegisterPage> {
                     prefixIcon: Icon(Icons.lock_outline, color: primaryColor),
                     suffixIcon: IconButton(
                       icon: Icon(
-                        _obscureConfirm ? Icons.visibility : Icons.visibility_off,
+                        _obscureConfirm
+                            ? Icons.visibility
+                            : Icons.visibility_off,
                         color: primaryColor,
                       ),
                       onPressed: () => setState(() {
                         _obscureConfirm = !_obscureConfirm;
                       }),
                       splashRadius: 24,
-                      tooltip: _obscureConfirm ? 'แสดงรหัสผ่าน' : 'ซ่อนรหัสผ่าน',
+                      tooltip: _obscureConfirm
+                          ? localizations.registerPickImageTooltipShow
+                          : localizations.registerPickImageTooltipHide,
                     ),
                   ),
                   validator: (val) {
-                    final pass = _formKey.currentState?.fields['password']?.value?.toString().trim() ?? '';
+                    final pass =
+                        _formKey.currentState?.fields['password']?.value
+                            ?.toString()
+                            .trim() ??
+                            '';
                     if (val == null || val.trim().isEmpty) {
-                      return 'กรุณายืนยันรหัสผ่าน';
+                      return localizations.registerConfirmPasswordEmpty;
                     }
                     if (val.trim() != pass) {
-                      return 'รหัสผ่านไม่ตรงกัน';
+                      return localizations.registerConfirmPasswordMismatch;
                     }
                     return null;
                   },
                   textInputAction: TextInputAction.done,
                   onEditingComplete: () {
-                    _formKey.currentState?.fields['confirm_password']?.validate();
+                    _formKey.currentState?.fields['confirm_password']
+                        ?.validate();
                     _checkFormValidity();
                     FocusScope.of(context).unfocus();
                   },
@@ -308,9 +364,12 @@ class _RegisterPageState extends State<RegisterPage> {
                             ? SizedBox(
                           width: 24,
                           height: 24,
-                          child: CircularProgressIndicator(color: onPrimaryColor, strokeWidth: 2),
+                          child: CircularProgressIndicator(
+                            color: onPrimaryColor,
+                            strokeWidth: 2,
+                          ),
                         )
-                            : const Text('สมัครสมาชิก'),
+                            : Text(localizations.registerButton),
                       ),
                     );
                   },

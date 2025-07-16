@@ -1,7 +1,11 @@
 import 'dart:async';
+
+import 'package:demo_flutter_app/routes/app_routes.dart';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
+import '../l10n/app_localizations.dart';
 import '../notifiers/user_notifier.dart';
 import 'login_page.dart';
 import 'main_page.dart';
@@ -14,8 +18,8 @@ class SplashPage extends StatefulWidget {
 }
 
 class _SplashPageState extends State<SplashPage> with TickerProviderStateMixin {
-  late AnimationController _fadeController;
-  late Animation<double> _fadeAnimation;
+  late final AnimationController _fadeController;
+  late final Animation<double> _fadeAnimation;
 
   @override
   void initState() {
@@ -33,26 +37,24 @@ class _SplashPageState extends State<SplashPage> with TickerProviderStateMixin {
   }
 
   Future<void> _initApp() async {
-    // Wait at least 1s to make splash visible
-    await Future.delayed(const Duration(seconds: 2));
-
+    final minSplashTime = Future.delayed(const Duration(seconds: 1));
     final userNotifier = context.read<UserNotifier>();
-    await userNotifier.loadUserFromDB();
-    final user = userNotifier.user;
+    final loadUser = userNotifier.loadUserFromDB();
+
+    await Future.wait([minSplashTime, loadUser]);
 
     if (!mounted) return;
 
-    Navigator.of(context).pushReplacement(
-      PageRouteBuilder(
-        transitionDuration: const Duration(milliseconds: 500),
-        pageBuilder: (_, __, ___) =>
-        user != null ? MainPage(user: user) : const LoginPage(),
-        transitionsBuilder: (_, animation, __, child) {
-          return FadeTransition(opacity: animation, child: child);
-        },
-      ),
-    );
+    final user = userNotifier.user;
+
+    // ✅ ใช้ go_router นำทาง
+    if (user != null) {
+      context.goNamed(AppRoutes.main);
+    } else {
+      context.goNamed(AppRoutes.login);
+    }
   }
+
 
   @override
   void dispose() {
@@ -63,6 +65,7 @@ class _SplashPageState extends State<SplashPage> with TickerProviderStateMixin {
   @override
   Widget build(BuildContext context) {
     final color = Theme.of(context).colorScheme;
+    final local = AppLocalizations.of(context)!;
 
     return Scaffold(
       backgroundColor: color.background,
@@ -72,14 +75,13 @@ class _SplashPageState extends State<SplashPage> with TickerProviderStateMixin {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(
-                Icons.shopping_bag,
-                size: 80,
-                color: color.primary,
+              Semantics(
+                label: local.appTitle,
+                child: Icon(Icons.shopping_bag, size: 80, color: color.primary),
               ),
               const SizedBox(height: 16),
               Text(
-                "Demo Flutter App",
+                local.appTitle,
                 style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                   fontWeight: FontWeight.bold,
                   color: color.primary,

@@ -14,31 +14,44 @@ class AvatarPicker extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final hasImage = imagePath != null && imagePath!.isNotEmpty;
+    final hasImage = imagePath != null && imagePath!.isNotEmpty && File(imagePath!).existsSync();
     final colorScheme = Theme.of(context).colorScheme;
 
     return GestureDetector(
       onTap: onTap,
-      child: Container(
-        width: double.infinity,
-        height: 100,
-        alignment: Alignment.center,
-        // ลองเพิ่ม decoration สีพื้นหลังโปร่งใสหน่อย
-        decoration: BoxDecoration(
-          color: colorScheme.primary.withOpacity(0.1), // สีพื้นหลังอ่อนๆ
-          shape: BoxShape.circle,
-        ),
-        child: CircleAvatar(
-          radius: 60,
-          backgroundColor: colorScheme.primary, // สีพื้นหลังชัดๆของ CircleAvatar
-          backgroundImage: hasImage ? FileImage(File(imagePath!)) : null,
-          child: !hasImage
-              ? Icon(
-            Icons.account_circle,
-            size: 100,
-            color: colorScheme.onPrimary,
-          )
-              : null,
+      child: Center(
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            CircleAvatar(
+              radius: 60,
+              backgroundColor: colorScheme.secondaryContainer,
+              backgroundImage: hasImage ? FileImage(File(imagePath!)) : null,
+              child: !hasImage
+                  ? Icon(
+                Icons.account_circle,
+                size: 100,
+                color: Colors.white70,
+              )
+                  : null,
+            ),
+            Positioned(
+              bottom: 4,
+              right: 4,
+              child: Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: colorScheme.primary,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.edit,
+                  color: colorScheme.onPrimary,
+                  size: 20,
+                ),
+              ),
+            )
+          ],
         ),
       ),
     );

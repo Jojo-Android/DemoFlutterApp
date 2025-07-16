@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../db/favorite_db_helper.dart';
+import '../l10n/app_localizations.dart';
 import '../model/product.dart';
 import '../notifiers/user_notifier.dart';
+import '../widgets/product_list_tile.dart';
 
 class FavoritePage extends StatefulWidget {
   const FavoritePage({super.key});
@@ -13,35 +15,53 @@ class FavoritePage extends StatefulWidget {
 }
 
 class _FavoritePageState extends State<FavoritePage> {
-  late Future<List<Product>> _favoritesFuture;
+  List<Product> _favorites = [];
+  bool _isLoading = true;
+  int? _removingProductId;
 
   @override
   void initState() {
     super.initState();
-    _loadFavorites();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadFavorites());
   }
 
-  void _loadFavorites() {
-    final user = context.read<UserNotifier>().user;
-    if (user == null) return;
-    _favoritesFuture = FavoriteDBHelper.instance.getFavoritesByUser(
+  Future<void> _loadFavorites() async {
+    final user = context.read<UserNotifier>().user!;
+    setState(() => _isLoading = true);
+
+    final favorites = await FavoriteDBHelper.instance.getFavoritesByUser(
       userEmail: user.email,
     );
+
+    if (!mounted) return;
+    setState(() {
+      _favorites = favorites;
+      _isLoading = false;
+    });
   }
 
   Future<void> _removeFavorite(int productId) async {
-    final user = context.read<UserNotifier>().user;
-    if (user == null) return;
+    if (_removingProductId != null) return;
+
+    setState(() {
+      _removingProductId = productId;
+      _favorites = List.from(_favorites)..removeWhere((p) => p.id == productId);
+    });
+
+    final user = context.read<UserNotifier>().user!;
+    final localizations = AppLocalizations.of(context)!;
 
     await FavoriteDBHelper.instance.remove(
       userEmail: user.email,
       productId: productId,
     );
-    _loadFavorites();
-    setState(() {});
+
+    if (!mounted) return;
+    setState(() => _removingProductId = null);
+
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: const Text('ลบออกจากรายการโปรดเรียบร้อยแล้ว'),
+        content: Text(localizations.removeFromFavoritesTooltip),
         duration: const Duration(seconds: 2),
         behavior: SnackBarBehavior.floating,
         backgroundColor: Theme.of(context).colorScheme.error,
@@ -50,200 +70,68 @@ class _FavoritePageState extends State<FavoritePage> {
     );
   }
 
-  Future<void> _refresh() async {
-    _loadFavorites();
-    setState(() {});
-    await _favoritesFuture;
+  Future<void> _refresh() async => _loadFavorites();
+
+  Widget _buildEmptyState(BuildContext context) {
+    final localizations = AppLocalizations.of(context)!;
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 32),
+        child: Text(
+          localizations.favoritePageEmptyMessage,
+          style: theme.textTheme.headlineSmall?.copyWith(
+            color: colorScheme.onBackground.withOpacity(0.5),
+            fontWeight: FontWeight.w500,
+          ),
+          textAlign: TextAlign.center,
+        ),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    final user = context.watch<UserNotifier>().user;
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-
-    if (user == null) {
-      return Scaffold(
-        appBar: AppBar(
-          title: const Text("รายการโปรด"),
-          backgroundColor: colorScheme.primary,
-          foregroundColor: colorScheme.onPrimary,
-          elevation: 3,
-        ),
-        body: Center(
-          child: Text(
-            'ไม่พบข้อมูลผู้ใช้',
-            style: theme.textTheme.bodyLarge,
-            textAlign: TextAlign.center,
-          ),
-        ),
-      );
-    }
+    final localizations = AppLocalizations.of(context)!;
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text("รายการโปรด"),
+        title: Text(localizations.favoritePageTitle),
         backgroundColor: colorScheme.primary,
         foregroundColor: colorScheme.onPrimary,
         elevation: 3,
         centerTitle: true,
       ),
-      body: RefreshIndicator(
-        onRefresh: _refresh,
-        color: colorScheme.primary,
-        child: FutureBuilder<List<Product>>(
-          future: _favoritesFuture,
-          builder: (context, snapshot) {
-            if (snapshot.hasError) {
-              return Center(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 24),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.error_outline,
-                          size: 48, color: colorScheme.error),
-                      const SizedBox(height: 16),
-                      Text(
-                        'เกิดข้อผิดพลาด: ${snapshot.error}',
-                        style: theme.textTheme.bodyMedium
-                            ?.copyWith(color: colorScheme.error),
-                        textAlign: TextAlign.center,
-                      ),
-                      const SizedBox(height: 16),
-                      ElevatedButton.icon(
-                        icon: const Icon(Icons.refresh),
-                        label: const Text('ลองใหม่'),
-                        onPressed: () {
-                          setState(() {
-                            _loadFavorites();
-                          });
-                        },
-                        style: ElevatedButton.styleFrom(
-                          shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8)),
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 24, vertical: 12),
-                        ),
-                      ),
-                    ],
-                  ),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : _favorites.isEmpty
+          ? _buildEmptyState(context)
+          : RefreshIndicator(
+              onRefresh: _refresh,
+              color: colorScheme.primary,
+              child: ListView.separated(
+                padding: const EdgeInsets.symmetric(
+                  vertical: 12,
+                  horizontal: 16,
                 ),
-              );
-            }
-
-            if (snapshot.connectionState == ConnectionState.waiting) {
-              return const Center(child: CircularProgressIndicator());
-            }
-
-            final favorites = snapshot.data ?? [];
-
-            if (favorites.isEmpty) {
-              return Center(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 32),
-                  child: Text(
-                    'ยังไม่มีรายการโปรด',
-                    style: theme.textTheme.headlineSmall?.copyWith(
-                      color: colorScheme.onBackground.withOpacity(0.5),
-                      fontWeight: FontWeight.w500,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                ),
-              );
-            }
-
-            return ListView.separated(
-              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-              itemCount: favorites.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 12),
-              physics: const AlwaysScrollableScrollPhysics(),
-              itemBuilder: (_, index) {
-                final product = favorites[index];
-                return Card(
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16)),
-                  elevation: 6,
-                  shadowColor: colorScheme.primary.withOpacity(0.25),
-                  clipBehavior: Clip.hardEdge,
-                  child: InkWell(
-                    onTap: () {
-                      // TODO: Navigate to product detail page
-                    },
-                    child: Container(
-                      padding: const EdgeInsets.all(12),
-                      child: Row(
-                        children: [
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(12),
-                            child: Image.network(
-                              product.image,
-                              width: 70,
-                              height: 70,
-                              fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) => Icon(
-                                Icons.broken_image,
-                                color: colorScheme.onSurface.withOpacity(0.3),
-                                size: 70,
-                              ),
-                              loadingBuilder: (context, child, progress) {
-                                if (progress == null) return child;
-                                return SizedBox(
-                                  width: 70,
-                                  height: 70,
-                                  child: Center(
-                                    child: CircularProgressIndicator(
-                                      value: progress.expectedTotalBytes != null
-                                          ? progress.cumulativeBytesLoaded /
-                                          progress.expectedTotalBytes!
-                                          : null,
-                                      strokeWidth: 2.5,
-                                    ),
-                                  ),
-                                );
-                              },
-                            ),
-                          ),
-                          const SizedBox(width: 16),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  product.title,
-                                  style: theme.textTheme.titleMedium?.copyWith(
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                                const SizedBox(height: 6),
-                                Text(
-                                  product.category,
-                                  style: theme.textTheme.bodySmall?.copyWith(
-                                    color: colorScheme.onSurface.withOpacity(0.6),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          IconButton(
-                            tooltip: 'ลบออกจากรายการโปรด',
-                            icon: Icon(Icons.favorite, color: colorScheme.error),
-                            onPressed: () => _removeFavorite(product.id),
-                            splashRadius: 26,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                );
-              },
-            );
-          },
-        ),
-      ),
+                itemCount: _favorites.length,
+                separatorBuilder: (_, __) => const SizedBox(height: 12),
+                physics: const AlwaysScrollableScrollPhysics(),
+                itemBuilder: (context, index) {
+                  final product = _favorites[index];
+                  return ProductListTile(
+                    product: product,
+                    isFavorite: true,
+                    isLoadingFavorite: _removingProductId == product.id,
+                    onFavoriteToggle: (_) => _removeFavorite(product.id),
+                  );
+                },
+              ),
+            ),
     );
   }
 }

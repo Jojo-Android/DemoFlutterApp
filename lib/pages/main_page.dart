@@ -1,4 +1,4 @@
-import 'package:demo_flutter_app/model/user_model.dart';
+import 'package:demo_flutter_app/l10n/app_localizations.dart';
 import 'package:demo_flutter_app/pages/favorite_page.dart';
 import 'package:demo_flutter_app/pages/setting_page.dart';
 import 'package:flutter/material.dart';
@@ -6,9 +6,7 @@ import 'package:flutter/material.dart';
 import 'home_page.dart';
 
 class MainPage extends StatefulWidget {
-  final UserModel user;
-
-  const MainPage({super.key, required this.user});
+  const MainPage({super.key});
 
   @override
   _MainPageState createState() => _MainPageState();
@@ -17,15 +15,12 @@ class MainPage extends StatefulWidget {
 class _MainPageState extends State<MainPage> {
   int _currentIndex = 0;
 
-  final List<Widget> pages = const [
-    const HomePage(),
-    const FavoritePage(),
-    const SettingPage(),
-  ];
+  final List<Widget> pages = const [HomePage(), FavoritePage(), SettingPage()];
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final local = AppLocalizations.of(context)!;
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
@@ -45,26 +40,31 @@ class _MainPageState extends State<MainPage> {
           onTap: (index) => setState(() => _currentIndex = index),
           backgroundColor: theme.bottomNavigationBarTheme.backgroundColor,
           selectedItemColor: theme.bottomNavigationBarTheme.selectedItemColor,
-          unselectedItemColor: theme.bottomNavigationBarTheme.unselectedItemColor,
-          showUnselectedLabels: theme.bottomNavigationBarTheme.showUnselectedLabels ?? true,
-          type: theme.bottomNavigationBarTheme.type ?? BottomNavigationBarType.fixed,
+          unselectedItemColor:
+              theme.bottomNavigationBarTheme.unselectedItemColor,
+          showUnselectedLabels:
+              theme.bottomNavigationBarTheme.showUnselectedLabels ?? true,
+          type:
+              theme.bottomNavigationBarTheme.type ??
+              BottomNavigationBarType.fixed,
           selectedLabelStyle: theme.bottomNavigationBarTheme.selectedLabelStyle,
-          unselectedLabelStyle: theme.bottomNavigationBarTheme.unselectedLabelStyle,
-          items: const [
+          unselectedLabelStyle:
+              theme.bottomNavigationBarTheme.unselectedLabelStyle,
+          items: [
             BottomNavigationBarItem(
               icon: Icon(Icons.home_outlined),
               activeIcon: Icon(Icons.home),
-              label: 'Home',
+              label: local.homePageTitle,
             ),
             BottomNavigationBarItem(
               icon: Icon(Icons.favorite_border),
               activeIcon: Icon(Icons.favorite),
-              label: 'Favorite',
+              label: local.favoritePageTitle,
             ),
             BottomNavigationBarItem(
               icon: Icon(Icons.settings_outlined),
               activeIcon: Icon(Icons.settings),
-              label: 'Settings',
+              label: local.settingsPageTitle,
             ),
           ],
         ),
@@ -72,4 +72,3 @@ class _MainPageState extends State<MainPage> {
     );
   }
 }
-

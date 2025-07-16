@@ -1,14 +1,20 @@
-import 'package:demo_flutter_app/theme.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
 
+import 'l10n/app_localizations.dart';
 import 'notifiers/user_notifier.dart';
-import 'pages/splash_page.dart';
+import 'notifiers/locale_notifier.dart';
+import 'routes/router.dart'; // import your GoRouter instance
+import 'theme.dart';
 
 void main() {
   runApp(
     MultiProvider(
-      providers: [ChangeNotifierProvider(create: (_) => UserNotifier())],
+      providers: [
+        ChangeNotifierProvider(create: (_) => UserNotifier()),
+        ChangeNotifierProvider(create: (_) => LocaleNotifier()),
+      ],
       child: const MyApp(),
     ),
   );
@@ -19,11 +25,22 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
+    final localeNotifier = context.watch<LocaleNotifier>();
+
+    return MaterialApp.router(
       debugShowCheckedModeBanner: false,
-      title: 'Shopping App',
+      title: AppLocalizations.of(context)?.appName ?? 'Demo Flutter App',
+      locale: localeNotifier.locale,
+      supportedLocales: AppLocalizations.supportedLocales,
+      localizationsDelegates: const [
+        AppLocalizations.delegate,
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
       theme: shoppingAppTheme,
-      home: const SplashPage(),
+      routerConfig: router,
     );
+
   }
 }

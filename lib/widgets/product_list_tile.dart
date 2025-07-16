@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+
+import '../l10n/app_localizations.dart';
 import '../model/product.dart';
 
 typedef FavoriteToggleCallback = Future<void> Function(Product product);
@@ -20,8 +22,8 @@ class ProductListTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final primary = theme.colorScheme.primary;
-    final onSurface = theme.colorScheme.onSurface;
+    final colorScheme = theme.colorScheme;
+    final local = AppLocalizations.of(context)!;
 
     return Card(
       elevation: 3,
@@ -29,9 +31,11 @@ class ProductListTile extends StatelessWidget {
       margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
-        onTap: () {},
-        splashColor: primary.withOpacity(0.08),
-        highlightColor: primary.withOpacity(0.05),
+        onTap: () {
+          // TODO: Add navigation or action on tap if needed
+        },
+        splashColor: colorScheme.primary.withOpacity(0.1),
+        highlightColor: colorScheme.primary.withOpacity(0.05),
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           child: Row(
@@ -44,7 +48,11 @@ class ProductListTile extends StatelessWidget {
                   width: 64,
                   height: 64,
                   fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => const Icon(Icons.broken_image, size: 40),
+                  errorBuilder: (_, __, ___) => Icon(
+                    Icons.broken_image,
+                    size: 40,
+                    color: colorScheme.onSurface.withOpacity(0.3),
+                  ),
                 ),
               ),
               const SizedBox(width: 12),
@@ -56,7 +64,7 @@ class ProductListTile extends StatelessWidget {
                       product.title,
                       style: theme.textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.w600,
-                        color: onSurface,
+                        color: colorScheme.onSurface,
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
@@ -65,7 +73,7 @@ class ProductListTile extends StatelessWidget {
                     Text(
                       product.category,
                       style: theme.textTheme.bodySmall?.copyWith(
-                        color: Colors.grey[600],
+                        color: colorScheme.onSurface.withOpacity(0.6),
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
@@ -75,20 +83,42 @@ class ProductListTile extends StatelessWidget {
               ),
               const SizedBox(width: 12),
               Tooltip(
-                message: isFavorite ? 'ลบจากรายการโปรด' : 'เพิ่มในรายการโปรด',
-                child: isLoadingFavorite
-                    ? SizedBox(
-                  width: 32,
-                  height: 32,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-                    : IconButton(
-                  icon: Icon(
-                    isFavorite ? Icons.favorite : Icons.favorite_border_outlined,
-                    color: isFavorite ? Colors.red : Colors.grey[700],
-                    size: 28,
+                message: isFavorite
+                    ? local.favoriteToggleRemove
+                    : local.favoriteToggleAdd,
+                child: AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 350),
+                  transitionBuilder: (child, animation) =>
+                      ScaleTransition(scale: animation, child: child),
+                  child: isLoadingFavorite
+                      ? SizedBox(
+                    key: const ValueKey('loading'),
+                    width: 32,
+                    height: 32,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2.5,
+                      color: colorScheme.primary,
+                    ),
+                  )
+                      : IconButton(
+                    key: ValueKey(isFavorite ? 'fav' : 'not-fav'),
+                    icon: Icon(
+                      isFavorite
+                          ? Icons.favorite
+                          : Icons.favorite_border_outlined,
+                      color: isFavorite
+                          ? colorScheme.error
+                          : colorScheme.onSurface.withOpacity(0.7),
+                      size: 28,
+                    ),
+                    onPressed: isLoadingFavorite
+                        ? null
+                        : () async => await onFavoriteToggle(product),
+                    splashRadius: 24,
+                    tooltip: isFavorite
+                        ? local.favoriteToggleRemove
+                        : local.favoriteToggleAdd,
                   ),
-                  onPressed: () async => await onFavoriteToggle(product),
                 ),
               ),
             ],
